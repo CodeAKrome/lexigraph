@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "lexigraph"
+version = "0.1.0"
+description = ""
+authors = ["kyle gaspar <kyleg.job@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+graphviz = "^0.20.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
