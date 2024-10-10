@@ -5,12 +5,13 @@ import requests
 from PIL import Image
 from io import BytesIO
 import fire
+import base64
 
 DEFAULT_MODEL = "gemini-1.5-pro"
 DEFAULT_MODEL = "gemini-1.5-flash"
 
 class GeminiAI:
-    def __init__(self, system_prompt=None, model=DEFAULT_MODEL, max_tokens=1500, temperature=0.1, api_key=None):
+    def __init__(self, system_prompt=None, model=DEFAULT_MODEL, max_tokens=3000, temperature=0.1, api_key=None):
         self.api_key = api_key or os.environ.get('GEMINI_API_KEY')
         configure(api_key=self.api_key)
 
@@ -24,12 +25,19 @@ class GeminiAI:
         self.chat = self.model.start_chat(history=[])
         self.chat.send_message(self.prompt)
 
-    def load_image(self, image_path_or_url):
-        if image_path_or_url.startswith(('http://', 'https://')):
-            response = requests.get(image_path_or_url)
+    def load_image(self, PathUrlBase64):
+        """
+        Returns an image object from a path, URL or base64 encoded image data.
+        """
+        if PathUrlBase64.startswith(('http://', 'https://')):
+            response = requests.get(PathUrlBase64)
             img = Image.open(BytesIO(response.content))
+        elif PathUrlBase64.startswith('data:image'):
+            # Handle base64 encoded image data
+            img_data = PathUrlBase64.split(',')[1]
+            img = Image.open(BytesIO(base64.b64decode(img_data)))
         else:
-            img = Image.open(image_path_or_url)
+            img = Image.open(PathUrlBase64)
         return img
 
     def says(self, prompt, image_path_or_url=None):
@@ -39,13 +47,17 @@ class GeminiAI:
             image = self.load_image(image_path_or_url)
             content.append(image)
 
-        response = self.model.generate_content(
-            content,
-            generation_config={
-                "max_output_tokens": self.max_tokens,
-                "temperature": self.temperature
-            }
-        )
+        try:
+            response = self.model.generate_content(
+                content,
+                generation_config={
+                    "max_output_tokens": self.max_tokens,
+                    "temperature": self.temperature
+                }
+            )
+        except Exception as e:
+            sys.stderr.write(f"Error generating content: {e}\n")
+            return None
 
         return response.text
 

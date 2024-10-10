@@ -2,9 +2,13 @@ import graphviz
 from io import StringIO
 import base64
 import sys
+from rich.markdown import Markdown, Console
+import subprocess
+
+IMGCAT = '/Users/kyle/.iterm2/imgcat'
 
 class Lexigraph:
-    def __init__(self, llm='gemini', system='system.txt'):
+    def __init__(self, graph_type='dotfile', llm='gemini', system='system.txt', graph_prompt=None):
         self.graph = None
         try:
             with open(system, 'r') as f:
@@ -12,12 +16,32 @@ class Lexigraph:
         except FileNotFoundError:
             sys.stderr.write(f"System prompt file not found: {system}\n")
             self.system_prompt = 'You are a star news reporter. You pay attention to what, where, why, who, when and how to answer questions.'
+
+        self.graph_type = graph_type
+        self.graph_file = f"{graph_type}.txt"
+
+        try:
+            with open(self.graph_file, 'r') as f:
+                self.graph_prompt = f.read()
+        except FileNotFoundError:
+            sys.stderr.write(f"Graph prompt file not found: {self.graph_file}\n")
+            self.graph_prompt = 'You are a star news reporter. You pay attention to what, where, why, who, when and how to answer questions.'
+
+        self.console = Console()
+
         if llm == 'gemini':
             from geminiai import GeminiAI
-            self.llm = GeminiAI()
+            self.llm = GeminiAI(system_prompt=self.system_prompt)
         else:
             raise ValueError(f"Invalid LLM: {llm}")
-        self.llm.set_system(self.system_prompt)
+
+
+        # sys.stderr.write(f"SYS: {self.system_prompt}\n")
+
+        try:
+            self.llm.set_system(self.system_prompt)
+        except Exception as e:
+            sys.stderr.write(f"Error setting system prompt: {e}\n")
 
     def imagine(self, prompt, format='png'):
         """
@@ -28,35 +52,61 @@ class Lexigraph:
         :return: Path to the rendered image
         """
         # dot_content, base64_image = self.imagine_for_llm(prompt, format=format)
-        dot_content, image_path = self.imagine_for_llm(prompt, format='png')
+        graph_content, base64_image = self.create_image(prompt, format=format)
         meh = self.llm.says(prompt)
-        ans = self.llm.says(prompt, image_path)
+        graph_system = self.system_prompt + "\nThe image shows a digraph of the relationships between the entities in the article.\nDo not refer to the image in your answer, it is for reference only.\n"
+
+
+        # bug
+        sys.stderr.write(f"\nGRAPH_SYSTEM: {graph_system}\n")
+
+        # This should get restored after the image is rendered
+        self.llm.set_system(graph_system)
+
+        ans = self.llm.says(prompt, base64_image)
         return meh, ans
 
-    def imagine_for_llm(self, prompt, format='png'):
+    def create_image(self, prompt, format='png'):
         """
-        Create a dotfile using an LLM and render it to an image for LLM inference.
+        Create dot or cypher statements using an LLM and render it to an image for LLM inference.
 
         :param input_data: File path, list of strings, or dot content string
         :param format:
         """
-        dot_content = self.llm.says(prompt)
+
+        graph_prompt = self.graph_prompt + prompt
+
+        # bug
+        # sys.stderr.write(f"\nGRAPH PROMPT: {graph_prompt}\n")
+
+
+        graph_content = self.llm.says(self.graph_prompt + prompt)
+
+        if not graph_content:
+            sys.stderr.write(f"ERROR: LLM gave no response\n")
+            return None, None
+
+        # bug
+        sys.stderr.write(f"\nGRAPH:==\n{graph_content}\n==\n")
 
         # Extract dot content
         start_marker = "```dot"
         end_marker = "```"
-        start_index = dot_content.find(start_marker)
-        end_index = dot_content.find(end_marker, start_index + len(start_marker))
+        start_index = graph_content.find(start_marker)
+        end_index = graph_content.find(end_marker, start_index + len(start_marker))
 
         if start_index != -1 and end_index != -1:
-            dot_content = dot_content[start_index + len(start_marker):end_index].strip()
+            graph_content = graph_content[start_index + len(start_marker):end_index].strip()
         else:
-            raise ValueError("Dot content not found between ```dot and ``` markers")
+            raise ValueError("Graph content not found between ```dot and ``` markers")
 
+        base64_image = self.render_for_llm(graph_content, format=format)
 
-        # base64_image = self.render_for_llm(dot_content, format=format)
-        base64_image = self.render_to_file(dot_content, format=format)
-        return dot_content, base64_image
+        # bug
+        self.outfile = self.render_to_file(graph_content)
+        subprocess.run([IMGCAT, self.outfile])
+
+        return graph_content, base64_image
 
     def _create_graph(self, input_data):
         """
@@ -141,23 +191,31 @@ if __name__ == "__main__":
     renderer = Lexigraph()
 
     # Example dot file content
-    dot_content = """
-    digraph G {
-        A -> B;
-        B -> C;
-        C -> A;
-    }
-    """
+    # dot_content = """
+    # digraph G {
+    #     A -> B;
+    #     B -> C;
+    #     C -> A;
+    # }
+    # """
 
-    salt = "sample"
-    with open('preamble.txt', 'r') as f:
-        preamble = f.read()
+    # salt = "sample"
+
+
     with open('article.txt', 'r') as f:
-        article = f.read()
-    prompt = preamble + article
-    meh, ans = renderer.imagine(prompt)
+        prompt = f.read()
 
-    print(f"LLM says:\nMEH:\n<{meh}>\n\nANS:\n<{ans}>\n")
+    meh, ans = renderer.imagine(prompt)
+    mdmeh = Markdown(meh)
+    mdans = Markdown(ans)
+
+    console = Console()
+
+    console.print(mdmeh)
+    print("\n========\n")
+    console.print(mdans)
+
+    # print(f"LLM says:\nMEH:\n<{mdmeh}>\n\nANS:\n<{mdans}>\n")
 
     # # Render from string to file
     # renderer.render_to_file(dot_content, output_file=salt, format='png')
