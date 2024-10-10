@@ -1,10 +1,62 @@
 import graphviz
 from io import StringIO
 import base64
+import sys
 
-class GraphvizRenderer:
-    def __init__(self):
+class Lexigraph:
+    def __init__(self, llm='gemini', system='system.txt'):
         self.graph = None
+        try:
+            with open(system, 'r') as f:
+                self.system_prompt = f.read()
+        except FileNotFoundError:
+            sys.stderr.write(f"System prompt file not found: {system}\n")
+            self.system_prompt = 'You are a star news reporter. You pay attention to what, where, why, who, when and how to answer questions.'
+        if llm == 'gemini':
+            from geminiai import GeminiAI
+            self.llm = GeminiAI()
+        else:
+            raise ValueError(f"Invalid LLM: {llm}")
+        self.llm.set_system(self.system_prompt)
+
+    def imagine(self, prompt, format='png'):
+        """
+        Create a dotfile using an LLM and render it to an image.
+
+        :param input_data: File path, list of strings, or dot content string
+        :param format: Output format (e.g., 'png', 'svg', 'pdf')
+        :return: Path to the rendered image
+        """
+        # dot_content, base64_image = self.imagine_for_llm(prompt, format=format)
+        dot_content, image_path = self.imagine_for_llm(prompt, format='png')
+        meh = self.llm.says(prompt)
+        ans = self.llm.says(prompt, image_path)
+        return meh, ans
+
+    def imagine_for_llm(self, prompt, format='png'):
+        """
+        Create a dotfile using an LLM and render it to an image for LLM inference.
+
+        :param input_data: File path, list of strings, or dot content string
+        :param format:
+        """
+        dot_content = self.llm.says(prompt)
+
+        # Extract dot content
+        start_marker = "```dot"
+        end_marker = "```"
+        start_index = dot_content.find(start_marker)
+        end_index = dot_content.find(end_marker, start_index + len(start_marker))
+
+        if start_index != -1 and end_index != -1:
+            dot_content = dot_content[start_index + len(start_marker):end_index].strip()
+        else:
+            raise ValueError("Dot content not found between ```dot and ``` markers")
+
+
+        # base64_image = self.render_for_llm(dot_content, format=format)
+        base64_image = self.render_to_file(dot_content, format=format)
+        return dot_content, base64_image
 
     def _create_graph(self, input_data):
         """
@@ -86,7 +138,7 @@ class GraphvizRenderer:
 
 # Example usage
 if __name__ == "__main__":
-    renderer = GraphvizRenderer()
+    renderer = Lexigraph()
 
     # Example dot file content
     dot_content = """
@@ -98,22 +150,30 @@ if __name__ == "__main__":
     """
 
     salt = "sample"
+    with open('preamble.txt', 'r') as f:
+        preamble = f.read()
+    with open('article.txt', 'r') as f:
+        article = f.read()
+    prompt = preamble + article
+    meh, ans = renderer.imagine(prompt)
 
-    # Render from string to file
-    renderer.render_to_file(dot_content, output_file=salt, format='png')
+    print(f"LLM says:\nMEH:\n<{meh}>\n\nANS:\n<{ans}>\n")
 
-    with open(f"{salt}.dot", 'w') as f:
-        f.write(dot_content)
+    # # Render from string to file
+    # renderer.render_to_file(dot_content, output_file=salt, format='png')
 
-    # Render from file
-    renderer.render_to_file(f"{salt}.dot", output_file=salt, format='svg')
+    # with open(f"{salt}.dot", 'w') as f:
+    #     f.write(dot_content)
 
-    # Render to bytes
-    image_bytes = renderer.render_to_bytes(dot_content, format='png')
-    if image_bytes:
-        print(f"Image size: {len(image_bytes)} bytes")
+    # # Render from file
+    # renderer.render_to_file(f"{salt}.dot", output_file=salt, format='svg')
 
-    # Render for LLM inference
-    llm_encoded = renderer.render_for_llm(dot_content, format='png')
-    if llm_encoded:
-        print(f"LLM encoded image (truncated): {llm_encoded[:50]}...")
+    # # Render to bytes
+    # image_bytes = renderer.render_to_bytes(dot_content, format='png')
+    # if image_bytes:
+    #     print(f"Image size: {len(image_bytes)} bytes")
+
+    # # Render for LLM inference
+    # llm_encoded = renderer.render_for_llm(dot_content, format='png')
+    # if llm_encoded:
+    #     print(f"LLM encoded image (truncated): {llm_encoded[:50]}...")

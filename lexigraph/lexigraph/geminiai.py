@@ -39,8 +39,6 @@ class GeminiAI:
             image = self.load_image(image_path_or_url)
             content.append(image)
 
-
-
         response = self.model.generate_content(
             content,
             generation_config={
