@@ -11,7 +11,7 @@ DEFAULT_MODEL = "gemini-1.5-pro"
 DEFAULT_MODEL = "gemini-1.5-flash"
 
 class GeminiAI:
-    def __init__(self, system_prompt=None, model=DEFAULT_MODEL, max_tokens=3000, temperature=0.1, api_key=None):
+    def __init__(self, system_prompt=None, model=DEFAULT_MODEL, max_tokens=6000, temperature=0.1, api_key=None):
         self.api_key = api_key or os.environ.get('GEMINI_API_KEY')
         configure(api_key=self.api_key)
 

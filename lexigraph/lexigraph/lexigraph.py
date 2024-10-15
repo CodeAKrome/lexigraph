@@ -105,6 +105,10 @@ class Lexigraph:
             sys.stderr.write(f"System prompt file not found: {system}. Using default system prompt.\n")
             return DEFAULT_SYSTEM_PROMPT
 
+    def set_system(self, system):
+        self.llm.set_system(system)
+        self.system_prompt = system
+
     def imagine(self, prompt, rag=[], output_file=None, format='png'):
         """
         Create a dotfile using an LLM and render it to an image.
@@ -128,6 +132,12 @@ class Lexigraph:
         meh_prompt = rag[0] + "\n" + prompt
 
         meh = self.llm.says(meh_prompt)
+
+        
+        #bug
+        sys.stderr.write(f"RAW MEH:\n{meh}\n")
+
+        
         # graph_system = self.system_prompt + "\nThe image shows a digraph of the relationships between the entities in the article.\nDo not refer to the image in your answer, it is for reference only.\n"
         graph_system = self.system_prompt
 
@@ -146,6 +156,11 @@ class Lexigraph:
         sys.stderr.write(f"\nIMG: {base64_image[:16]}\n")
 
         ans = self.llm.says(meh_prompt, base64_image)
+
+
+        #bug
+        sys.stderr.write(f"RAW ANS:\n{ans}\n")
+
 
         return meh, ans
 
@@ -169,8 +184,11 @@ class Lexigraph:
         foo = "Example:\nIsrael wants war with Iran.\n\"Israel\" -> \"Iran\" [label=\"wants war\"];\n"
         foo += "You will represent all the marked entities, leaving none out, in relationships in a graphviz dot file.\n"
         foo += "Create a Knowledge Graph using a graphviz dot file to represent the relationships and entities in the following news article(s):\n"
-        graph_prompt = foo + rag[0] + "\n"
-        # graph_prompt = rag[0] + "\n"
+
+        # HACK swapping prompts
+        graph_prompt = self.system_prompt + rag[0] + "\n" 
+        self.set_system(foo)
+        # graph_prompt = foo + rag[0] + "\n"
 
 
         # bug
@@ -184,7 +202,7 @@ class Lexigraph:
             return None, None
 
         # bug
-        sys.stderr.write(f"\nGRAPH:==\n{graph_content}\n==\n")
+        # sys.stderr.write(f"\nGRAPH:==\n{graph_content}\n==\n")
 
         recs = graph_content.split("\n")
         out = []
@@ -194,28 +212,32 @@ class Lexigraph:
 
         for rec in recs:
 
-
-            sys.stderr.write(f"==> REC: {rec}\n")
-
-
             if b in rec:
                 # sys.stderr.write(f"START: {rec}\n")
-                oneshot = True
+                oneshot = 'Begin'
 
             if oneshot:
                 out.append(rec)
+                sys.stderr.write(f"{rec}\n")
+            else:
+                sys.stderr.write(f"=> {rec}\n")
 
             if e in rec:
-
+                oneshot = 'End'
                 # sys.stderr.write(f"END: {rec}\n")
 
                 break
 
         graph_content = "\n".join(out)
 
+        # If oneshot wasn't closed properly, this is a brken graph.
+        # This is probably because max_tokens killed th output. Try setting it higher.
+        if oneshot != 'End':
+            sys.stderr.write(f"ERROR: Graph not closed properly, oneshot={oneshot}\nINCOMPLETE GRAPH:\n{graph_content}\n")
+            exit(1)
 
         # bug
-        sys.stderr.write(f"\nOUT -> GRAPH:==>>\n{graph_content}\n==\n")
+        # sys.stderr.write(f"\nOUT -> GRAPH:==>>\n{graph_content}\n==\n")
 
         # # Extract dot content
         # start_marker = "```dot"
@@ -235,15 +257,19 @@ class Lexigraph:
         base64_image = self.render_for_llm(graph_content, format=format)
 
         # bug
-        sys.stderr.write(f"\nRENDER GRAPH_CONTENT: {graph_content}\n")
+        # sys.stderr.write(f"\nRENDER GRAPH_CONTENT: {graph_content}\n")
 
 
         try:
             self.outfile = self.render_to_file(graph_content, output_file=output_file)
-            subprocess.run([IMGCAT, self.outfile])
         except Exception as e:
             sys.stderr.write(f"Error rendering image: {e}\n")
 
+        # Print pretty picture
+        try:
+            subprocess.run([IMGCAT, self.outfile])
+        except Exception as e:
+            sys.stderr.write(f"Error running imgcat at path: {IMGCAT}\n")
         return graph_content, base64_image
 
     def _create_graph(self, input_data):
@@ -364,6 +390,13 @@ if __name__ == "__main__":
 
     print(f"===> Prompt: {prompt}<=====\n\n")
     meh, ans = renderer.imagine(prompt, [article])
+
+    # print("\n========\n")
+    # print(f"RAW MEH:\n{meh}\n\nRAW ANS:\n{ans}\n")
+
+    # print("\n========\n\n\n")
+
+    # Pretty print
     mdmeh = Markdown(meh)
     mdans = Markdown(ans)
 
