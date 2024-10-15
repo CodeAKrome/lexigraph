@@ -1,10 +1,11 @@
 import graphviz
 import sys
 
+
 class gr:
     def __init__(self):
-        self.text = 'foo'
-        
+        self.text = "foo"
+
     def _create_graph(self, input_data):
         """
         Create a graphviz.Source object from input data.
@@ -14,21 +15,23 @@ class gr:
         """
         if isinstance(input_data, str):
             # Check if it's a file path
-            if input_data.endswith('.dot') or input_data.endswith('.gv'):
-                with open(input_data, 'r') as f:
+            if input_data.endswith(".dot") or input_data.endswith(".gv"):
+                with open(input_data, "r") as f:
                     dot_content = f.read()
             else:
                 # Treat it as dot content string
                 dot_content = input_data
         elif isinstance(input_data, list):
             # Join lines into a single string
-            dot_content = '\n'.join(input_data)
+            dot_content = "\n".join(input_data)
         else:
-            raise ValueError("Input must be a file path, list of strings, or a dot content string")
+            raise ValueError(
+                "Input must be a file path, list of strings, or a dot content string"
+            )
 
         return graphviz.Source(dot_content)
 
-    def render_to_file(self, input_data, output_file=None, format='png'):
+    def render_to_file(self, input_data, output_file=None, format="png"):
         """
         Render a GraphViz image and save to a file.
 
@@ -42,7 +45,9 @@ class gr:
             output_file = "output"
         try:
             # Render the graph
-            rendered_path = self.graph.render(filename=output_file, format=format, cleanup=True)
+            rendered_path = self.graph.render(
+                filename=output_file, format=format, cleanup=True
+            )
             print(f"Image rendered successfully: {rendered_path}")
             return rendered_path
         except graphviz.ExecutableNotFound:
@@ -50,8 +55,9 @@ class gr:
         except Exception as e:
             print(f"An error occurred while rendering the image: {str(e)}")
 
+
 g = gr()
-with open(sys.argv[1], 'r') as f:
+with open(sys.argv[1], "r") as f:
     data = f.read()
-    
+
 g.render_to_file(data)

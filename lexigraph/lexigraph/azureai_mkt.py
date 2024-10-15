@@ -12,12 +12,12 @@ client = ChatCompletionsClient(
     credential=AzureKeyCredential(token),
 )
 
-with open('dotfile2.txt', 'r') as f:
+with open("dotfile2.txt", "r") as f:
     system = f.read()
 
-with open('rag.txt', 'r') as f:
+with open("rag.txt", "r") as f:
     rag = f.read()
-    
+
 # response = client.complete(
 #     messages=[
 #         SystemMessage(content="You are a helpful assistant."),
@@ -32,12 +32,15 @@ with open('rag.txt', 'r') as f:
 response = client.complete(
     messages=[
         SystemMessage(content=system),
-        UserMessage(content="Create a Knowledge Graph in dot file format of the following articles. Assign the entity name to the dot label like 'Jimmy Dean' and the type of entity as type like 'PERSON' for example [label=\"Jimmy Dean\", type=\"PERSON\"]\n" + rag),
+        UserMessage(
+            content="Create a Knowledge Graph in dot file format of the following articles. Assign the entity name to the dot label like 'Jimmy Dean' and the type of entity as type like 'PERSON' for example [label=\"Jimmy Dean\", type=\"PERSON\"]\n"
+            + rag
+        ),
     ],
     temperature=1.0,
     top_p=1.0,
     max_tokens=2000,
-    model=model_name
+    model=model_name,
 )
 
 print(response.choices[0].message.content)

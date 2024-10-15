@@ -6,28 +6,34 @@ from PIL import Image
 from io import BytesIO
 import requests
 
-DEFAULT_MODEL = 'llama3.1:70b'
+DEFAULT_MODEL = "llama3.1:70b"
+
 
 # add print method to show llm data like model etc
 class OllamaAI:
-    def __init__(self, system_prompt=None, model=DEFAULT_MODEL, max_tokens=3000, temperature=0.1):
+    def __init__(
+        self, system_prompt=None, model=DEFAULT_MODEL, max_tokens=3000, temperature=0.1
+    ):
         self.model = model
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.set_system(system_prompt)
 
     def set_system(self, prompt):
-        self.system = prompt or "You are a helpful assistant. You reply with short, accurate answers."
+        self.system = (
+            prompt
+            or "You are a helpful assistant. You reply with short, accurate answers."
+        )
 
     def load_image(self, PathUrlBase64):
         """
         Returns an image object from a path, URL or base64 encoded image data.
         """
-        if PathUrlBase64.startswith(('http://', 'https://')):
+        if PathUrlBase64.startswith(("http://", "https://")):
             response = requests.get(PathUrlBase64)
             img = Image.open(BytesIO(response.content))
-        elif PathUrlBase64.startswith('data:image'):
-            img_data = PathUrlBase64.split(',')[1]
+        elif PathUrlBase64.startswith("data:image"):
+            img_data = PathUrlBase64.split(",")[1]
             img = Image.open(BytesIO(base64.b64decode(img_data)))
         else:
             img = Image.open(PathUrlBase64)
@@ -55,19 +61,27 @@ class OllamaAI:
                 options={
                     "temperature": self.temperature,
                     "system": self.system,
-                    "num_predict": self.max_tokens
-                }
+                    "num_predict": self.max_tokens,
+                },
             )
-            return response['message']['content']
+            return response["message"]["content"]
         except Exception as e:
             sys.stderr.write(f"Error generating content: {e}\n")
             return None
 
+
 def load_from_file(file_path):
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         return file.read().strip()
 
-def main(prompt=None, prompt_file=None, image=None, system_prompt=None, system_prompt_file=None):
+
+def main(
+    prompt=None,
+    prompt_file=None,
+    image=None,
+    system_prompt=None,
+    system_prompt_file=None,
+):
     """
     Interact with OllamaAI.
 
@@ -90,6 +104,8 @@ def main(prompt=None, prompt_file=None, image=None, system_prompt=None, system_p
     response = ollama_ai.says(prompt, image)
     print(response)
 
+
 if __name__ == "__main__":
     import fire
+
     fire.Fire(main)

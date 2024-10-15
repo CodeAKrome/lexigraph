@@ -10,9 +10,17 @@ import base64
 DEFAULT_MODEL = "gemini-1.5-pro"
 DEFAULT_MODEL = "gemini-1.5-flash"
 
+
 class GeminiAI:
-    def __init__(self, system_prompt=None, model=DEFAULT_MODEL, max_tokens=6000, temperature=0.1, api_key=None):
-        self.api_key = api_key or os.environ.get('GEMINI_API_KEY')
+    def __init__(
+        self,
+        system_prompt=None,
+        model=DEFAULT_MODEL,
+        max_tokens=6000,
+        temperature=0.1,
+        api_key=None,
+    ):
+        self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
         configure(api_key=self.api_key)
 
         self.model = GenerativeModel(model)
@@ -21,7 +29,10 @@ class GeminiAI:
         self.set_system(system_prompt)
 
     def set_system(self, prompt):
-        self.prompt = prompt or "You are a helpful assistant. You reply with short, accurate answers."
+        self.prompt = (
+            prompt
+            or "You are a helpful assistant. You reply with short, accurate answers."
+        )
         self.chat = self.model.start_chat(history=[])
         self.chat.send_message(self.prompt)
 
@@ -29,12 +40,12 @@ class GeminiAI:
         """
         Returns an image object from a path, URL or base64 encoded image data.
         """
-        if PathUrlBase64.startswith(('http://', 'https://')):
+        if PathUrlBase64.startswith(("http://", "https://")):
             response = requests.get(PathUrlBase64)
             img = Image.open(BytesIO(response.content))
-        elif PathUrlBase64.startswith('data:image'):
+        elif PathUrlBase64.startswith("data:image"):
             # Handle base64 encoded image data
-            img_data = PathUrlBase64.split(',')[1]
+            img_data = PathUrlBase64.split(",")[1]
             img = Image.open(BytesIO(base64.b64decode(img_data)))
         else:
             img = Image.open(PathUrlBase64)
@@ -52,8 +63,8 @@ class GeminiAI:
                 content,
                 generation_config={
                     "max_output_tokens": self.max_tokens,
-                    "temperature": self.temperature
-                }
+                    "temperature": self.temperature,
+                },
             )
         except Exception as e:
             sys.stderr.write(f"Error generating content: {e}\n")
@@ -61,11 +72,19 @@ class GeminiAI:
 
         return response.text
 
+
 def load_from_file(file_path):
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         return file.read().strip()
 
-def main(prompt=None, prompt_file=None, image=None, system_prompt=None, system_prompt_file=None):
+
+def main(
+    prompt=None,
+    prompt_file=None,
+    image=None,
+    system_prompt=None,
+    system_prompt_file=None,
+):
     """
     Interact with GeminiAI.
 
@@ -87,6 +106,7 @@ def main(prompt=None, prompt_file=None, image=None, system_prompt=None, system_p
     gemini = GeminiAI(system_prompt=system_prompt)
     response = gemini.says(prompt, image)
     print(response)
+
 
 if __name__ == "__main__":
     fire.Fire(main)

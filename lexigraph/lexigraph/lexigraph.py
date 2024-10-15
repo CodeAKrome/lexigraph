@@ -6,9 +6,9 @@ from rich.markdown import Markdown, Console
 import subprocess
 import os
 
-IMGCAT = '/Users/kyle/.iterm2/imgcat'
-DEFAULT_LLM = 'ollama'
-DEFAULT_SYSTEM_PROMPT = 'You are a star news reporter. You pay attention to what, where, why, who, when and how to answer questions.'
+IMGCAT = "/Users/kyle/.iterm2/imgcat"
+DEFAULT_LLM = "ollama"
+DEFAULT_SYSTEM_PROMPT = "You are a star news reporter. You pay attention to what, where, why, who, when and how to answer questions."
 DEFAULT_GRAPH_PROMPT = """
 Use the following to answer questions:
 Object Graphs: In computer science, object graphs represent a network of objects connected through their relationships, either directly or indirectly. These relationships are modeled as edges between nodes (objects) in a directed graph, which may be cyclic.
@@ -44,8 +44,17 @@ WORK_OF_ART name of work of art Mona Lisa, Star Wars
 Using those rules, create a Knowledge Graph using a graphviz dotfile to represent the relationships and entities in the following news article:
 """
 
+
 class Lexigraph:
-    def __init__(self, graph_type='dotfile', llm=DEFAULT_LLM, model=None, system_prompt=None, graph_prompt=None, graph_file=None):
+    def __init__(
+        self,
+        graph_type="dotfile",
+        llm=DEFAULT_LLM,
+        model=None,
+        system_prompt=None,
+        graph_prompt=None,
+        graph_file=None,
+    ):
         self.graph = None
         self.file_dir = os.path.dirname(os.path.abspath(__file__))
         if not system_prompt:
@@ -66,23 +75,25 @@ class Lexigraph:
             sys.stderr.write(f"Error setting system prompt: {e}\n")
 
     def _llm(self, llm, model):
-
         # bug
         # sys.stderr.write(f"LLM: {llm} Model: {model}\nPROMPT: {self.system_prompt}\n")
         sys.stderr.write(f"LLM: {llm} Model: {model}\n")
 
-        if llm == 'gemini':
+        if llm == "gemini":
             from geminiai import GeminiAI
+
             if model:
                 return GeminiAI(system_prompt=self.system_prompt, model=model)
             return GeminiAI(system_prompt=self.system_prompt)
-        elif llm == 'ollama':
+        elif llm == "ollama":
             from ollamaai import OllamaAI
+
             if model:
                 return OllamaAI(system_prompt=self.system_prompt, model=model)
             return OllamaAI(system_prompt=self.system_prompt)
-        elif llm == 'sambanova':
+        elif llm == "sambanova":
             from sambanovaai import SambanovaAI
+
             if model:
                 return SambanovaAI(system_prompt=self.system_prompt, model=model)
             return SambanovaAI(system_prompt=self.system_prompt)
@@ -91,25 +102,29 @@ class Lexigraph:
 
     def set_graph_prompt(self, graph_file):
         try:
-            with open(graph_file, 'r') as f:
+            with open(graph_file, "r") as f:
                 return f.read()
         except FileNotFoundError:
-            sys.stderr.write(f"Graph prompt file not found: {graph_file}. Using default graph prompt.\n")
+            sys.stderr.write(
+                f"Graph prompt file not found: {graph_file}. Using default graph prompt.\n"
+            )
             return DEFAULT_GRAPH_PROMPT
 
     def _system_prompt(self, system):
         try:
-            with open(system, 'r') as f:
+            with open(system, "r") as f:
                 return f.read()
         except FileNotFoundError:
-            sys.stderr.write(f"System prompt file not found: {system}. Using default system prompt.\n")
+            sys.stderr.write(
+                f"System prompt file not found: {system}. Using default system prompt.\n"
+            )
             return DEFAULT_SYSTEM_PROMPT
 
     def set_system(self, system):
         self.llm.set_system(system)
         self.system_prompt = system
 
-    def imagine(self, prompt, rag=[], output_file=None, format='png'):
+    def imagine(self, prompt, rag=[], output_file=None, format="png"):
         """
         Create a dotfile using an LLM and render it to an image.
 
@@ -119,12 +134,12 @@ class Lexigraph:
         """
         # dot_content, base64_image = self.imagine_for_llm(prompt, format=format)
 
-
         # bug
         # sys.stderr.write(f"\nRAG: {rag[0]} output_file: {output_file} format: {format}\n")
 
-
-        graph_content, base64_image = self.create_image(rag, output_file=output_file, format=format)
+        graph_content, base64_image = self.create_image(
+            rag, output_file=output_file, format=format
+        )
         if not graph_content or not base64_image:
             sys.stderr.write(f"\nNO IMAGE OUTPUT\n")
             exit(1)
@@ -133,18 +148,14 @@ class Lexigraph:
 
         meh = self.llm.says(meh_prompt)
 
-        
-        #bug
+        # bug
         sys.stderr.write(f"RAW MEH:\n{meh}\n")
 
-        
         # graph_system = self.system_prompt + "\nThe image shows a digraph of the relationships between the entities in the article.\nDo not refer to the image in your answer, it is for reference only.\n"
         graph_system = self.system_prompt
 
-
         # bug
         # sys.stderr.write(f"\nGRAPH_SYSTEM: {graph_system}\n")
-
 
         # This should get restored after the image is rendered
         self.llm.set_system(graph_system)
@@ -157,14 +168,12 @@ class Lexigraph:
 
         ans = self.llm.says(meh_prompt, base64_image)
 
-
-        #bug
+        # bug
         sys.stderr.write(f"RAW ANS:\n{ans}\n")
-
 
         return meh, ans
 
-    def create_image(self, rag, output_file=None, format='png'):
+    def create_image(self, rag, output_file=None, format="png"):
         """
         Create dot or cypher statements using an LLM and render it to an image for LLM inference.
 
@@ -181,19 +190,19 @@ class Lexigraph:
 
         # graph_prompt = self.graph_prompt + rag[0] + "\n"
         # foo = "Show relationships in dot file like:\nHossein_Daghighi -> advisor_to [label=\"advisor to\"];\n"
-        foo = "Example:\nIsrael wants war with Iran.\n\"Israel\" -> \"Iran\" [label=\"wants war\"];\n"
+        foo = 'Example:\nIsrael wants war with Iran.\n"Israel" -> "Iran" [label="wants war"];\n'
         foo += "You will represent all the marked entities, leaving none out, in relationships in a graphviz dot file.\n"
         foo += "Create a Knowledge Graph using a graphviz dot file to represent the relationships and entities in the following news article(s):\n"
 
         # HACK swapping prompts
-        graph_prompt = self.system_prompt + rag[0] + "\n" 
+        graph_prompt = self.system_prompt + rag[0] + "\n"
         self.set_system(foo)
         # graph_prompt = foo + rag[0] + "\n"
 
-
         # bug
-        sys.stderr.write(f"\n---\nGRAPH\nSYSTEM: {self.system_prompt}\nGRAPH PROMPT: {graph_prompt}\n===\n")
-
+        sys.stderr.write(
+            f"\n---\nGRAPH\nSYSTEM: {self.system_prompt}\nGRAPH PROMPT: {graph_prompt}\n===\n"
+        )
 
         graph_content = self.llm.says(graph_prompt)
 
@@ -211,10 +220,9 @@ class Lexigraph:
         e = "}"
 
         for rec in recs:
-
             if b in rec:
                 # sys.stderr.write(f"START: {rec}\n")
-                oneshot = 'Begin'
+                oneshot = "Begin"
 
             if oneshot:
                 out.append(rec)
@@ -223,7 +231,7 @@ class Lexigraph:
                 sys.stderr.write(f"=> {rec}\n")
 
             if e in rec:
-                oneshot = 'End'
+                oneshot = "End"
                 # sys.stderr.write(f"END: {rec}\n")
 
                 break
@@ -232,8 +240,10 @@ class Lexigraph:
 
         # If oneshot wasn't closed properly, this is a brken graph.
         # This is probably because max_tokens killed th output. Try setting it higher.
-        if oneshot != 'End':
-            sys.stderr.write(f"ERROR: Graph not closed properly, oneshot={oneshot}\nINCOMPLETE GRAPH:\n{graph_content}\n")
+        if oneshot != "End":
+            sys.stderr.write(
+                f"ERROR: Graph not closed properly, oneshot={oneshot}\nINCOMPLETE GRAPH:\n{graph_content}\n"
+            )
             exit(1)
 
         # bug
@@ -259,7 +269,6 @@ class Lexigraph:
         # bug
         # sys.stderr.write(f"\nRENDER GRAPH_CONTENT: {graph_content}\n")
 
-
         try:
             self.outfile = self.render_to_file(graph_content, output_file=output_file)
         except Exception as e:
@@ -281,21 +290,23 @@ class Lexigraph:
         """
         if isinstance(input_data, str):
             # Check if it's a file path
-            if input_data.endswith('.dot') or input_data.endswith('.gv'):
-                with open(input_data, 'r') as f:
+            if input_data.endswith(".dot") or input_data.endswith(".gv"):
+                with open(input_data, "r") as f:
                     dot_content = f.read()
             else:
                 # Treat it as dot content string
                 dot_content = input_data
         elif isinstance(input_data, list):
             # Join lines into a single string
-            dot_content = '\n'.join(input_data)
+            dot_content = "\n".join(input_data)
         else:
-            raise ValueError("Input must be a file path, list of strings, or a dot content string")
+            raise ValueError(
+                "Input must be a file path, list of strings, or a dot content string"
+            )
 
         return graphviz.Source(dot_content)
 
-    def render_to_file(self, input_data, output_file=None, format='png'):
+    def render_to_file(self, input_data, output_file=None, format="png"):
         """
         Render a GraphViz image and save to a file.
 
@@ -309,7 +320,9 @@ class Lexigraph:
             output_file = f"{self.file_dir}/output"
         try:
             # Render the graph
-            rendered_path = self.graph.render(filename=output_file, format=format, cleanup=True)
+            rendered_path = self.graph.render(
+                filename=output_file, format=format, cleanup=True
+            )
             print(f"Image rendered successfully: {rendered_path}")
             return rendered_path
         except graphviz.ExecutableNotFound:
@@ -317,7 +330,7 @@ class Lexigraph:
         except Exception as e:
             print(f"An error occurred while rendering the image: {str(e)}")
 
-    def render_to_bytes(self, input_data, format='png'):
+    def render_to_bytes(self, input_data, format="png"):
         """
         Render a GraphViz image and return as bytes.
 
@@ -337,7 +350,7 @@ class Lexigraph:
         except Exception as e:
             print(f"An error occurred while rendering the image: {str(e)}")
 
-    def render_for_llm(self, input_data, format='png'):
+    def render_for_llm(self, input_data, format="png"):
         """
         Render a GraphViz image and return as a base64 encoded string for LLM inference.
 
@@ -347,9 +360,10 @@ class Lexigraph:
         """
         image_bytes = self.render_to_bytes(input_data, format)
         if image_bytes:
-            base64_encoded = base64.b64encode(image_bytes).decode('utf-8')
+            base64_encoded = base64.b64encode(image_bytes).decode("utf-8")
             return f"data:image/{format};base64,{base64_encoded}"
         return None
+
 
 # Example usage
 if __name__ == "__main__":
@@ -367,9 +381,11 @@ if __name__ == "__main__":
         # renderer = Lexigraph(llm=llm, model=model)
         dot2 = f"{file_dir}/prompts/dotfile2.txt"
         # renderer = Lexigraph(llm=llm, model=model, graph_prompt=dot2, prompt=dot2)
-        renderer = Lexigraph(llm=llm, model=model, graph_prompt=dot2, system_prompt=dot2)
+        renderer = Lexigraph(
+            llm=llm, model=model, graph_prompt=dot2, system_prompt=dot2
+        )
     else:
-        renderer = Lexigraph(llm='ollama')
+        renderer = Lexigraph(llm="ollama")
 
     # Example dot file content
     # dot_content = """
@@ -382,7 +398,7 @@ if __name__ == "__main__":
 
     # salt = "sample"
 
-    with open(f"{file_dir}/rag/{ragfile}", 'r') as f:
+    with open(f"{file_dir}/rag/{ragfile}", "r") as f:
         article = f.read()
 
     # prompt = "When is the best time to see an aurora in New Jersey?"
