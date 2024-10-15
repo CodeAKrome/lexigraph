@@ -4,38 +4,60 @@ import base64
 import sys
 from rich.markdown import Markdown, Console
 import subprocess
+import os
 
 IMGCAT = '/Users/kyle/.iterm2/imgcat'
+DEFAULT_LLM = 'ollama'
+DEFAULT_SYSTEM_PROMPT = 'You are a star news reporter. You pay attention to what, where, why, who, when and how to answer questions.'
+DEFAULT_GRAPH_PROMPT = """
+Use the following to answer questions:
+Object Graphs: In computer science, object graphs represent a network of objects connected through their relationships, either directly or indirectly. These relationships are modeled as edges between nodes (objects) in a directed graph, which may be cyclic.
+Knowledge Graphs: Knowledge graphs are a type of graph data structure that represents entities (nodes) and their relationships (edges) as triples (subject-predicate-object). This allows for the storage and querying of semantic facts and schema models.
+RDF Triplestore: RDF triplestores are a specific type of graph database that stores semantic facts as subject-predicate-object triples. This format enables the representation of relationships between entities using Universal Resource Identifiers (URIs) as unique identifiers.
+Subject-Verb Agreement: In grammar, subject-verb agreement refers to the rule that the verb should agree with the subject (singular or plural) in number. This applies to sentences with compound subjects connected by “or” or “nor”.
+Subject-Verb-Object Word Order: In linguistic typology, the subject-verb-object (SVO) word order is a common sentence structure where the subject comes first, followed by the verb, and then the object.
+
+Graph relationships can be represented as directed edges between nodes (objects) or as subject-predicate-object triples.
+Knowledge graphs and RDF triplestores are specific types of graph databases designed for storing and querying semantic facts.
+Subject-verb agreement in grammar ensures that the verb agrees with the subject in number.
+The subject-verb-object word order is a common sentence structure in many languages.
+
+Entity Meaning Example
+CARDINAL cardinal value 1, 2, 3, ...
+DATE date value 2023-12-25, January 1st
+EVENT event name Super Bowl, Olympics
+FAC building name Empire State Building, Eiffel Tower
+GPE geo-political entity United States, France
+LANGUAGE language name English, Spanish
+LAW law name Constitution, Copyright Act
+LOC location name New York City, Paris
+MONEY money name dollar, euro
+NORP affiliation Republican, Democrat
+ORDINAL ordinal value first, second, third
+ORG organization name NASA, Google
+PERCENT percent value 50%, 75%
+PERSON person name John Doe, Jane Smith
+PRODUCT product name iPhone, MacBook
+QUANTITY quantity value 10, 20
+TIME time value 12:00 PM, 5:30 AM
+WORK_OF_ART name of work of art Mona Lisa, Star Wars
+Using those rules, create a Knowledge Graph using a graphviz dotfile to represent the relationships and entities in the following news article:
+"""
 
 class Lexigraph:
-    def __init__(self, graph_type='dotfile', llm='gemini', system='system.txt', graph_prompt=None):
+    def __init__(self, graph_type='dotfile', llm=DEFAULT_LLM, model=None, system_prompt=None, graph_prompt=None, graph_file=None):
         self.graph = None
-        try:
-            with open(system, 'r') as f:
-                self.system_prompt = f.read()
-        except FileNotFoundError:
-            sys.stderr.write(f"System prompt file not found: {system}\n")
-            self.system_prompt = 'You are a star news reporter. You pay attention to what, where, why, who, when and how to answer questions.'
-
+        self.file_dir = os.path.dirname(os.path.abspath(__file__))
+        if not system_prompt:
+            system_prompt = f"{self.file_dir}/prompts/system.txt"
+        self.system_prompt = self._system_prompt(system_prompt)
         self.graph_type = graph_type
         self.graph_file = f"{graph_type}.txt"
-
-        try:
-            with open(self.graph_file, 'r') as f:
-                self.graph_prompt = f.read()
-        except FileNotFoundError:
-            sys.stderr.write(f"Graph prompt file not found: {self.graph_file}\n")
-            self.graph_prompt = 'You are a star news reporter. You pay attention to what, where, why, who, when and how to answer questions.'
-
+        if graph_prompt:
+            self.graph_file = graph_prompt
+        self.graph_prompt = self.set_graph_prompt(self.graph_file)
         self.console = Console()
-
-        if llm == 'gemini':
-            from geminiai import GeminiAI
-            self.llm = GeminiAI(system_prompt=self.system_prompt)
-        else:
-            raise ValueError(f"Invalid LLM: {llm}")
-
-
+        self.llm = self._llm(llm, model)
         # sys.stderr.write(f"SYS: {self.system_prompt}\n")
 
         try:
@@ -43,7 +65,47 @@ class Lexigraph:
         except Exception as e:
             sys.stderr.write(f"Error setting system prompt: {e}\n")
 
-    def imagine(self, prompt, format='png'):
+    def _llm(self, llm, model):
+
+        # bug
+        # sys.stderr.write(f"LLM: {llm} Model: {model}\nPROMPT: {self.system_prompt}\n")
+        sys.stderr.write(f"LLM: {llm} Model: {model}\n")
+
+        if llm == 'gemini':
+            from geminiai import GeminiAI
+            if model:
+                return GeminiAI(system_prompt=self.system_prompt, model=model)
+            return GeminiAI(system_prompt=self.system_prompt)
+        elif llm == 'ollama':
+            from ollamaai import OllamaAI
+            if model:
+                return OllamaAI(system_prompt=self.system_prompt, model=model)
+            return OllamaAI(system_prompt=self.system_prompt)
+        elif llm == 'sambanova':
+            from sambanovaai import SambanovaAI
+            if model:
+                return SambanovaAI(system_prompt=self.system_prompt, model=model)
+            return SambanovaAI(system_prompt=self.system_prompt)
+        else:
+            raise ValueError(f"Invalid LLM: {llm}")
+
+    def set_graph_prompt(self, graph_file):
+        try:
+            with open(graph_file, 'r') as f:
+                return f.read()
+        except FileNotFoundError:
+            sys.stderr.write(f"Graph prompt file not found: {graph_file}. Using default graph prompt.\n")
+            return DEFAULT_GRAPH_PROMPT
+
+    def _system_prompt(self, system):
+        try:
+            with open(system, 'r') as f:
+                return f.read()
+        except FileNotFoundError:
+            sys.stderr.write(f"System prompt file not found: {system}. Using default system prompt.\n")
+            return DEFAULT_SYSTEM_PROMPT
+
+    def imagine(self, prompt, rag=[], output_file=None, format='png'):
         """
         Create a dotfile using an LLM and render it to an image.
 
@@ -52,21 +114,42 @@ class Lexigraph:
         :return: Path to the rendered image
         """
         # dot_content, base64_image = self.imagine_for_llm(prompt, format=format)
-        graph_content, base64_image = self.create_image(prompt, format=format)
-        meh = self.llm.says(prompt)
-        graph_system = self.system_prompt + "\nThe image shows a digraph of the relationships between the entities in the article.\nDo not refer to the image in your answer, it is for reference only.\n"
 
 
         # bug
-        sys.stderr.write(f"\nGRAPH_SYSTEM: {graph_system}\n")
+        # sys.stderr.write(f"\nRAG: {rag[0]} output_file: {output_file} format: {format}\n")
+
+
+        graph_content, base64_image = self.create_image(rag, output_file=output_file, format=format)
+        if not graph_content or not base64_image:
+            sys.stderr.write(f"\nNO IMAGE OUTPUT\n")
+            exit(1)
+            return None, None
+        meh_prompt = rag[0] + "\n" + prompt
+
+        meh = self.llm.says(meh_prompt)
+        # graph_system = self.system_prompt + "\nThe image shows a digraph of the relationships between the entities in the article.\nDo not refer to the image in your answer, it is for reference only.\n"
+        graph_system = self.system_prompt
+
+
+        # bug
+        # sys.stderr.write(f"\nGRAPH_SYSTEM: {graph_system}\n")
+
 
         # This should get restored after the image is rendered
         self.llm.set_system(graph_system)
 
-        ans = self.llm.says(prompt, base64_image)
+        # RECS 32 35 46 48 59 87
+        # unrelated 92
+
+        # bug
+        sys.stderr.write(f"\nIMG: {base64_image[:16]}\n")
+
+        ans = self.llm.says(meh_prompt, base64_image)
+
         return meh, ans
 
-    def create_image(self, prompt, format='png'):
+    def create_image(self, rag, output_file=None, format='png'):
         """
         Create dot or cypher statements using an LLM and render it to an image for LLM inference.
 
@@ -74,13 +157,27 @@ class Lexigraph:
         :param format:
         """
 
-        graph_prompt = self.graph_prompt + prompt
+        if not output_file:
+            output_file = f"{self.file_dir}/output"
 
         # bug
-        # sys.stderr.write(f"\nGRAPH PROMPT: {graph_prompt}\n")
+        # output_file = 'output'
+        sys.stderr.write(f"\nOUTPUT_FILE: ->{output_file}<-\n")
+
+        # graph_prompt = self.graph_prompt + rag[0] + "\n"
+        # foo = "Show relationships in dot file like:\nHossein_Daghighi -> advisor_to [label=\"advisor to\"];\n"
+        foo = "Example:\nIsrael wants war with Iran.\n\"Israel\" -> \"Iran\" [label=\"wants war\"];\n"
+        foo += "You will represent all the marked entities, leaving none out, in relationships in a graphviz dot file.\n"
+        foo += "Create a Knowledge Graph using a graphviz dot file to represent the relationships and entities in the following news article(s):\n"
+        graph_prompt = foo + rag[0] + "\n"
+        # graph_prompt = rag[0] + "\n"
 
 
-        graph_content = self.llm.says(self.graph_prompt + prompt)
+        # bug
+        sys.stderr.write(f"\n---\nGRAPH\nSYSTEM: {self.system_prompt}\nGRAPH PROMPT: {graph_prompt}\n===\n")
+
+
+        graph_content = self.llm.says(graph_prompt)
 
         if not graph_content:
             sys.stderr.write(f"ERROR: LLM gave no response\n")
@@ -89,22 +186,63 @@ class Lexigraph:
         # bug
         sys.stderr.write(f"\nGRAPH:==\n{graph_content}\n==\n")
 
-        # Extract dot content
-        start_marker = "```dot"
-        end_marker = "```"
-        start_index = graph_content.find(start_marker)
-        end_index = graph_content.find(end_marker, start_index + len(start_marker))
+        recs = graph_content.split("\n")
+        out = []
+        oneshot = False
+        b = "{"
+        e = "}"
 
-        if start_index != -1 and end_index != -1:
-            graph_content = graph_content[start_index + len(start_marker):end_index].strip()
-        else:
-            raise ValueError("Graph content not found between ```dot and ``` markers")
+        for rec in recs:
+
+
+            sys.stderr.write(f"==> REC: {rec}\n")
+
+
+            if b in rec:
+                # sys.stderr.write(f"START: {rec}\n")
+                oneshot = True
+
+            if oneshot:
+                out.append(rec)
+
+            if e in rec:
+
+                # sys.stderr.write(f"END: {rec}\n")
+
+                break
+
+        graph_content = "\n".join(out)
+
+
+        # bug
+        sys.stderr.write(f"\nOUT -> GRAPH:==>>\n{graph_content}\n==\n")
+
+        # # Extract dot content
+        # start_marker = "```dot"
+        # start_marker = "{"
+        # end_marker = "```"
+        # start_index = graph_content.find(start_marker)
+        # end_index = graph_content.find(end_marker, start_index + len(start_marker))
+
+        # if start_index != -1 and end_index != -1:
+        #     graph_content = graph_content[start_index + len(start_marker):end_index].strip()
+        # else:
+
+        #     # bug
+        #     sys.stderr.write("No dots\n")
+        #     # raise ValueError("Graph content not found between ```dot and ``` markers")
 
         base64_image = self.render_for_llm(graph_content, format=format)
 
         # bug
-        self.outfile = self.render_to_file(graph_content)
-        subprocess.run([IMGCAT, self.outfile])
+        sys.stderr.write(f"\nRENDER GRAPH_CONTENT: {graph_content}\n")
+
+
+        try:
+            self.outfile = self.render_to_file(graph_content, output_file=output_file)
+            subprocess.run([IMGCAT, self.outfile])
+        except Exception as e:
+            sys.stderr.write(f"Error rendering image: {e}\n")
 
         return graph_content, base64_image
 
@@ -131,7 +269,7 @@ class Lexigraph:
 
         return graphviz.Source(dot_content)
 
-    def render_to_file(self, input_data, output_file='output', format='png'):
+    def render_to_file(self, input_data, output_file=None, format='png'):
         """
         Render a GraphViz image and save to a file.
 
@@ -141,7 +279,8 @@ class Lexigraph:
         :return: Path to the rendered image
         """
         self.graph = self._create_graph(input_data)
-
+        if not output_file:
+            output_file = f"{self.file_dir}/output"
         try:
             # Render the graph
             rendered_path = self.graph.render(filename=output_file, format=format, cleanup=True)
@@ -188,7 +327,23 @@ class Lexigraph:
 
 # Example usage
 if __name__ == "__main__":
-    renderer = Lexigraph()
+    file_dir = os.path.dirname(os.path.abspath(__file__))
+    prompt = "Summarize the news article below:\n\n"
+
+    # renderer = Lexigraph(model='bespoke-minicheck:latest')
+    # renderer = Lexigraph(llm='gemini')
+    if len(sys.argv) > 1:
+        llm = sys.argv[1]
+        model = sys.argv[2]
+        ragfile = sys.argv[3]
+        prompt = sys.argv[4]
+        # renderer = Lexigraph(llm=llm, model=model
+        # renderer = Lexigraph(llm=llm, model=model)
+        dot2 = f"{file_dir}/prompts/dotfile2.txt"
+        # renderer = Lexigraph(llm=llm, model=model, graph_prompt=dot2, prompt=dot2)
+        renderer = Lexigraph(llm=llm, model=model, graph_prompt=dot2, system_prompt=dot2)
+    else:
+        renderer = Lexigraph(llm='ollama')
 
     # Example dot file content
     # dot_content = """
@@ -201,11 +356,14 @@ if __name__ == "__main__":
 
     # salt = "sample"
 
+    with open(f"{file_dir}/rag/{ragfile}", 'r') as f:
+        article = f.read()
 
-    with open('article.txt', 'r') as f:
-        prompt = f.read()
+    # prompt = "When is the best time to see an aurora in New Jersey?"
+    # prompt = "Wat are the chances of a peace treaty between Russia and Ukraine?"
 
-    meh, ans = renderer.imagine(prompt)
+    print(f"===> Prompt: {prompt}<=====\n\n")
+    meh, ans = renderer.imagine(prompt, [article])
     mdmeh = Markdown(meh)
     mdans = Markdown(ans)
 
