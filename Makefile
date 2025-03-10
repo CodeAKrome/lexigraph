@@ -1,3 +1,7 @@
+qwen72bsolar:
+	./test_llm.sh ollama 'qwen2.5:72b' solar.txt "Where is best for seeing the Aurora?"
+qwen72bsolarm:
+	./test_llm.sh ollama 'qwen2.5:72b' solar_m.txt "Where is best for seeing the Aurora?"
 llama70bsolar:
 	./test_llm.sh ollama 'llama3.1:70b' solar.txt "Where is best for seeing the Aurora?"
 llama70bsolarm:
