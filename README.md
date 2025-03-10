@@ -1,4 +1,4 @@
 # A picture is worth 1,000 tokens: Multimodal Informational Spectroscopy as a Mechanism to increase LLM Engagement.
 ## By projecting or synthesizing information from one or multiple domains into one or more projections such as from text to image, it is possible to increase LLM understanding and accuracy.
 Large language models are increasing capable of using information in different formats. Increasing engagement by using multiple senses (projections) for learning and understanding such as combining sight, sound, and tactile senses such when taking notes in a meeting has been shown to increase information comprehension and retention in humans and does so with machines.
-[solar example](img/qwen2.5:72b_solar_m.txt.png)
+![solar example](img/qwen2.5:72b_solar_m.txt.png)
